@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paradex API 测试工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+        .container {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid #333;
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ccc;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #0a0a0a;
+            color: #fff;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        button:disabled {
+            background: #4a5568;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Paradex API 测试工具</h1>
+        
+        <div class="input-group">
+            <label for="serverUrl">服务器地址:</label>
+            <input type="text" id="serverUrl" placeholder="http://your-server-ip:3002" value="http://localhost:3002">
+        </div>
+        
+        <div class="button-group">
+            <button onclick="testStatus()">测试状态</button>
+            <button onclick="testAnalysis()">测试分析</button>
+            <button onclick="testHistory()">测试历史</button>
+            <button onclick="testAll()">全部测试</button>
+        </div>
+        
+        <div id="result" class="result">点击按钮开始测试...</div>
+    </div>
+
+    <script>
+        const resultDiv = document.getElementById('result');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            };
+            
+            resultDiv.innerHTML += `<span style="color: ${colors[type]}">[${timestamp}] ${message}</span>\n`;
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+        
+        function clearResult() {
+            resultDiv.innerHTML = '';
+        }
+        
+        function getServerUrl() {
+            const url = document.getElementById('serverUrl').value.trim();
+            if (!url) {
+                log('❌ 请输入服务器地址', 'error');
+                return null;
+            }
+            return url.endsWith('/') ? url.slice(0, -1) : url;
+        }
+        
+        async function testStatus() {
+            clearResult();
+            const baseUrl = getServerUrl();
+            if (!baseUrl) return;
+            
+            log('🔍 测试服务器状态...', 'info');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/status`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ 服务器状态正常', 'success');
+                    log(`   - 状态: ${data.status}`, 'info');
+                    log(`   - 市场数量: ${data.markets}`, 'info');
+                    log(`   - 历史数据: ${data.historySize} 个市场`, 'info');
+                    log(`   - 数据收集中: ${data.isCollecting}`, 'info');
+                    log(`   - 使用代理: ${data.useProxy}`, 'info');
+                    
+                    if (data.proxyStats) {
+                        log(`   - 代理状态: ${data.proxyStats.active}/${data.proxyStats.total} 可用`, 'info');
+                    }
+                } else {
+                    log(`❌ 服务器响应错误: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 连接失败: ${error.message}`, 'error');
+                log('   请检查:', 'warning');
+                log('   - 服务器是否启动', 'warning');
+                log('   - 防火墙端口3002是否开放', 'warning');
+                log('   - 服务器地址是否正确', 'warning');
+            }
+        }
+        
+        async function testAnalysis() {
+            clearResult();
+            const baseUrl = getServerUrl();
+            if (!baseUrl) return;
+            
+            log('📊 测试分析数据...', 'info');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/analysis`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.totalMarkets > 0) {
+                        log('✅ 分析数据正常', 'success');
+                        log(`   - 分析市场数: ${data.totalMarkets}`, 'info');
+                        
+                        const topMarket = data.data[0];
+                        log(`   - 顶级市场: ${topMarket.symbol}`, 'info');
+                        log(`   - 稳定性评分: ${topMarket.stabilityScore.toFixed(1)}`, 'info');
+                        log(`   - 数据点数: ${topMarket.totalPoints}`, 'info');
+                        log(`   - 零点差频率: ${topMarket.zeroSpreadFreq.toFixed(2)}%`, 'info');
+                    } else {
+                        log('⚠️ 分析数据为空，可能需要等待数据收集', 'warning');
+                        log('   建议等待1-2分钟后重试', 'warning');
+                    }
+                } else {
+                    log(`❌ 分析数据获取失败: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 分析数据获取失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testHistory() {
+            clearResult();
+            const baseUrl = getServerUrl();
+            if (!baseUrl) return;
+            
+            log('📈 测试历史数据...', 'info');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/market/BTC-USD-PERP/history`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.count > 0) {
+                        log('✅ 历史数据正常', 'success');
+                        log(`   - BTC-USD-PERP 数据点: ${data.count}`, 'info');
+                        
+                        const latest = data.history[data.history.length - 1];
+                        log(`   - 最新买价: ${latest.bid}`, 'info');
+                        log(`   - 最新卖价: ${latest.ask}`, 'info');
+                        log(`   - 点差: ${latest.spreadPercent.toFixed(4)}%`, 'info');
+                        
+                        const updateTime = new Date(latest.timestamp).toLocaleString();
+                        log(`   - 更新时间: ${updateTime}`, 'info');
+                    } else {
+                        log('⚠️ 历史数据为空', 'warning');
+                    }
+                } else {
+                    log(`❌ 历史数据获取失败: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 历史数据获取失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAll() {
+            clearResult();
+            log('🚀 开始全面测试...', 'info');
+            log('', 'info');
+            
+            await testStatus();
+            log('', 'info');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testAnalysis();
+            log('', 'info');
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testHistory();
+            log('', 'info');
+            
+            log('🎯 全面测试完成！', 'success');
+        }
+    </script>
+</body>
+</html>
