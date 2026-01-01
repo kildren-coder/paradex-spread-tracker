@@ -14,6 +14,7 @@
 
 # production
 /build
+/server/proxies.txt
 
 # misc
 .DS_Store
@@ -33,3 +34,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# server specific
+server/node_modules/
+server/logs/
+server/spread-data.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+
+# Environment files
+.env

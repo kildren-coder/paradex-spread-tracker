@@ -1,106 +1,101 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import MarketCard from './components/MarketCard';
-import { BBO, MarketSpread } from './types';
+import AnalysisCard from './components/AnalysisCard';
+import { MarketAnalysis } from './types';
+
+// 数据收集服务器地址 - 生产环境需要更改
+const DATA_SERVER_URL = process.env.NEXT_PUBLIC_DATA_SERVER_URL || 'http://localhost:3002';
 
 export default function Home() {
-  const [markets, setMarkets] = useState<MarketSpread[]>([]);
+  const [analysis, setAnalysis] = useState<MarketAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(5000); // 默认5秒
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [serverStatus, setServerStatus] = useState<any>(null);
 
-  const fetchMarketData = useCallback(async () => {
+  const fetchAnalysisData = useCallback(async () => {
     try {
       setError(null);
       
-      // 获取所有perp市场
-      const marketsResponse = await fetch('/api/markets');
-      if (!marketsResponse.ok) {
-        throw new Error('Failed to fetch markets');
-      }
-      const marketsData = await marketsResponse.json();
+      const response = await fetch(`${DATA_SERVER_URL}/api/analysis`, {
+        cache: 'no-store',
+      });
       
-      // 为每个市场获取BBO数据 - 分批请求避免过载
-      const marketSpreads: MarketSpread[] = [];
-      const batchSize = 5; // 每批处理5个市场
-      
-      for (let i = 0; i < marketsData.results.length; i += batchSize) {
-        const batch = marketsData.results.slice(i, i + batchSize);
-        
-        const batchPromises = batch.map(async (market: any) => {
-          try {
-            const bboResponse = await fetch(`/api/bbo/${market.symbol}`);
-            if (bboResponse.ok) {
-              const bboData: BBO = await bboResponse.json();
-              
-              const bidPrice = parseFloat(bboData.bid);
-              const askPrice = parseFloat(bboData.ask);
-              const spread = askPrice - bidPrice;
-              const spreadPercent = (spread / bidPrice) * 100;
-              
-              return {
-                symbol: market.symbol,
-                bid_price: bidPrice,
-                ask_price: askPrice,
-                spread,
-                spread_percent: spreadPercent,
-                bid_size: bboData.bid_size,
-                ask_size: bboData.ask_size,
-                timestamp: bboData.last_updated_at,
-              };
-            }
-          } catch (error) {
-            console.error(`Error fetching BBO for ${market.symbol}:`, error);
-          }
-          return null;
-        });
-        
-        const batchResults = await Promise.all(batchPromises);
-        marketSpreads.push(...batchResults.filter(result => result !== null));
-        
-        // 批次间短暂延迟，避免过载
-        if (i + batchSize < marketsData.results.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      // 按点差百分比排序（从小到大）
-      marketSpreads.sort((a, b) => a.spread_percent - b.spread_percent);
+      const result = await response.json();
       
-      setMarkets(marketSpreads);
+      if (result.success) {
+        setAnalysis(result.data);
+        console.log(`Updated analysis for ${result.totalMarkets} markets at ${new Date().toLocaleTimeString()}`);
+      } else {
+        throw new Error(result.error || 'Failed to fetch analysis');
+      }
+      
     } catch (error) {
-      console.error('Error fetching market data:', error);
-      setError('获取市场数据失败，请稍后重试');
+      console.error('Error fetching analysis data:', error);
+      setError('无法连接到数据服务器，请确保后端服务正在运行');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  const fetchServerStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`${DATA_SERVER_URL}/api/status`, {
+        cache: 'no-store',
+      });
+      
+      if (response.ok) {
+        const status = await response.json();
+        setServerStatus(status);
+      }
+    } catch (error) {
+      console.error('Error fetching server status:', error);
+    }
+  }, []);
+
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchMarketData();
+    fetchAnalysisData();
+    fetchServerStatus();
   };
 
   useEffect(() => {
-    fetchMarketData();
+    fetchAnalysisData();
+    fetchServerStatus();
     
-    // 使用动态刷新间隔
-    const interval = setInterval(fetchMarketData, refreshInterval);
+    // 每10秒刷新分析数据
+    const interval = setInterval(() => {
+      fetchAnalysisData();
+      fetchServerStatus();
+    }, 10000);
     
     return () => clearInterval(interval);
-  }, [fetchMarketData, refreshInterval]);
+  }, [fetchAnalysisData, fetchServerStatus]);
+
+  // 实时时钟
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(clockInterval);
+  }, []);
 
   if (loading) {
     return (
       <div className="container">
         <div className="header">
-          <h1>Paradex 点差监控</h1>
-          <p>实时监控永续合约市场点差</p>
+          <h1>Paradex 点差稳定性分析</h1>
+          <p>基于3分钟滑动窗口的零点差/负点差频率分析</p>
         </div>
-        <div className="loading">正在加载市场数据...</div>
+        <div className="loading">正在加载分析数据...</div>
       </div>
     );
   }
@@ -109,16 +104,25 @@ export default function Home() {
     return (
       <div className="container">
         <div className="header">
-          <h1>Paradex 点差监控</h1>
-          <p>实时监控永续合约市场点差</p>
+          <h1>Paradex 点差稳定性分析</h1>
+          <p>基于3分钟滑动窗口的零点差/负点差频率分析</p>
         </div>
         <div className="error">{error}</div>
+        <div className="setup-instructions">
+          <h3>设置说明：</h3>
+          <ol>
+            <li>打开新终端，进入 server 目录</li>
+            <li>运行: npm install</li>
+            <li>运行: npm start</li>
+            <li>等待数据收集器启动并开始收集数据</li>
+          </ol>
+        </div>
         <button 
           className="refresh-button" 
           onClick={handleRefresh}
           disabled={refreshing}
         >
-          {refreshing ? '刷新中...' : '重新加载'}
+          {refreshing ? '重试中...' : '重试连接'}
         </button>
       </div>
     );
@@ -127,29 +131,69 @@ export default function Home() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Paradex 点差监控</h1>
-        <p>实时监控永续合约市场点差 • 按点差从小到大排序</p>
-        <div className="refresh-controls">
-          <label>刷新间隔: </label>
-          <select 
-            value={refreshInterval} 
-            onChange={(e) => setRefreshInterval(Number(e.target.value))}
-            className="interval-select"
-          >
-            <option value={1000}>1秒 (高频)</option>
-            <option value={3000}>3秒 (快速)</option>
-            <option value={5000}>5秒 (标准)</option>
-            <option value={10000}>10秒 (节能)</option>
-          </select>
+        <h1>Paradex 点差稳定性分析</h1>
+        <p>基于3分钟滑动窗口的零点差/负点差频率分析 • 按稳定性评分排序</p>
+        <div className="current-time">
+          当前时间: {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
+        </div>
+        {serverStatus && (
+          <div className="server-status">
+            数据收集状态: {serverStatus.isCollecting ? '🟢 收集中' : '🔴 停止'} | 
+            市场数: {serverStatus.markets} | 
+            历史数据: {serverStatus.historySize} 个市场
+            {serverStatus.useProxy && serverStatus.proxyStats && (
+              <span> | 代理: {serverStatus.proxyStats.active}/{serverStatus.proxyStats.total} 可用</span>
+            )}
+          </div>
+        )}
+        <div className="metrics-explanation">
+          <details>
+            <summary>📊 指标说明</summary>
+            <div className="explanation-content">
+              <div className="metric-item">
+                <strong>数据点数:</strong> 3分钟内收集到的价格快照数量，每2秒收集一次
+              </div>
+              <div className="metric-item">
+                <strong>稳定点差 (0.001%-0.01%):</strong> 最佳交易区间，流动性充足且成本可控
+              </div>
+              <div className="metric-item">
+                <strong>低点差 (&lt;0.001%):</strong> 极低成本，但可能流动性不足
+              </div>
+              <div className="metric-item">
+                <strong>零点差/负点差:</strong> 理论套利机会，但需警惕流动性陷阱
+              </div>
+              <div className="metric-item">
+                <strong>高点差 (&gt;0.01%):</strong> 交易成本较高，频繁出现表示风险较大
+              </div>
+              <div className="metric-item">
+                <strong>极高点差 (&gt;0.05%):</strong> 极高风险，可能导致重大损失
+              </div>
+              <div className="metric-item">
+                <strong>动态零点差权重:</strong> 稳定市场的零点差权重高(最高2.0)，不稳定市场权重低(最低0.2)
+              </div>
+              <div className="metric-item">
+                <strong>稳定性因子:</strong> 基于中等点差频率和低波动性计算，影响零点差的权重
+              </div>
+              <div className="metric-item">
+                <strong>一致性奖励:</strong> 零点差频率>20%且稳定点差频率>30%时获得额外奖励
+              </div>
+            </div>
+          </details>
         </div>
       </div>
       
-      {markets.length === 0 ? (
-        <div className="loading">暂无市场数据</div>
+      {analysis.length === 0 ? (
+        <div className="loading">
+          数据收集中，请等待至少1分钟以获得有效分析...
+          <div className="collection-info">
+            <p>系统正在每秒收集所有PERP市场的点差数据</p>
+            <p>需要积累足够的历史数据才能进行稳定性分析</p>
+          </div>
+        </div>
       ) : (
-        <div className="market-grid">
-          {markets.map((market) => (
-            <MarketCard key={market.symbol} market={market} />
+        <div className="analysis-grid">
+          {analysis.map((item) => (
+            <AnalysisCard key={item.symbol} analysis={item} />
           ))}
         </div>
       )}

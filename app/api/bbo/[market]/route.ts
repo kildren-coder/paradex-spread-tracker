@@ -12,6 +12,7 @@ export async function GET(
         headers: {
           'Accept': 'application/json',
         },
+        cache: 'no-store', // 禁用缓存
       }
     );
 
@@ -20,7 +21,13 @@ export async function GET(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error(`Error fetching BBO for ${params.market}:`, error);
     return NextResponse.json(

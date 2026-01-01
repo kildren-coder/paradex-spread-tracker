@@ -1,0 +1,13 @@
+# 代理配置示例
+# 格式: host:port:username:password
+# 每行一个代理
+
+# 示例代理（请替换为你的真实代理）
+# 50.114.92.141:5605:username:password
+# 31.57.90.186:5755:username:password
+# 50.114.92.88:5552:username:password
+
+# 注意：
+# 1. 请将此文件复制为 proxies.txt 并填入真实代理信息
+# 2. proxies.txt 文件已被 .gitignore 忽略，不会被提交到Git
+# 3. 如果没有代理文件，系统将使用直连模式

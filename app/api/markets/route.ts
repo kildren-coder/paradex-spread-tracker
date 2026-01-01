@@ -7,6 +7,7 @@ export async function GET() {
       headers: {
         'Accept': 'application/json',
       },
+      cache: 'no-store', // 禁用缓存
     });
 
     if (!response.ok) {
@@ -20,7 +21,13 @@ export async function GET() {
       market.asset_kind === 'PERP'
     );
 
-    return NextResponse.json({ results: perpMarkets });
+    return NextResponse.json({ results: perpMarkets }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Error fetching markets:', error);
     return NextResponse.json(

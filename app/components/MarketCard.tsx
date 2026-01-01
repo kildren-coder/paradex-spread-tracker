@@ -21,6 +21,17 @@ export default function MarketCard({ market }: MarketCardProps) {
     return `${percent.toFixed(3)}%`;
   };
 
+  const formatTime = (timestamp: number) => {
+    // Paradex API返回的是毫秒时间戳，转换为本地时间
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('zh-CN', { 
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   return (
     <div className="market-card">
       <div className="market-header">
@@ -50,6 +61,10 @@ export default function MarketCard({ market }: MarketCardProps) {
           <div className="detail-label">点差百分比</div>
           <div className="detail-value spread-percent">{formatPercent(market.spread_percent)}</div>
         </div>
+      </div>
+      
+      <div className="update-time">
+        更新时间: {formatTime(market.timestamp)}
       </div>
     </div>
   );
