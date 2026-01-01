@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端连接测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Paradex 前端连接测试</h1>
+    
+    <div id="status" class="status loading">正在测试连接...</div>
+    
+    <h3>测试结果：</h3>
+    <div id="results"></div>
+    
+    <script>
+        const DATA_SERVER_URL = 'http://141.11.139.93:3002';
+        
+        async function testConnection() {
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                // 测试后端状态
+                statusDiv.textContent = '正在连接后端服务器...';
+                const statusResponse = await fetch(`${DATA_SERVER_URL}/api/status`);
+                
+                if (!statusResponse.ok) {
+                    throw new Error(`HTTP ${statusResponse.status}: ${statusResponse.statusText}`);
+                }
+                
+                const statusData = await statusResponse.json();
+                
+                resultsDiv.innerHTML += `
+                    <div class="status success">
+                        <strong>✅ 后端连接成功</strong><br>
+                        状态: ${statusData.status}<br>
+                        市场数: ${statusData.markets}<br>
+                        历史数据: ${statusData.historySize} 个市场<br>
+                        代理状态: ${statusData.useProxy ? `${statusData.proxyStats.active}/${statusData.proxyStats.total} 可用` : '未使用代理'}
+                    </div>
+                `;
+                
+                // 测试分析数据
+                statusDiv.textContent = '正在获取分析数据...';
+                const analysisResponse = await fetch(`${DATA_SERVER_URL}/api/analysis`);
+                
+                if (!analysisResponse.ok) {
+                    throw new Error(`HTTP ${analysisResponse.status}: ${analysisResponse.statusText}`);
+                }
+                
+                const analysisData = await analysisResponse.json();
+                
+                if (analysisData.success) {
+                    resultsDiv.innerHTML += `
+                        <div class="status success">
+                            <strong>✅ 分析数据获取成功</strong><br>
+                            分析市场数: ${analysisData.data.length}<br>
+                            总市场数: ${analysisData.totalMarkets}
+                        </div>
+                    `;
+                    
+                    if (analysisData.data.length > 0) {
+                        const topMarket = analysisData.data[0];
+                        resultsDiv.innerHTML += `
+                            <div class="status success">
+                                <strong>📊 示例数据 (排名第一的市场)</strong><br>
+                                市场: ${topMarket.symbol}<br>
+                                稳定性评分: ${topMarket.stabilityScore.toFixed(2)}<br>
+                                数据点数: ${topMarket.totalPoints}<br>
+                                零点差频率: ${topMarket.zeroSpreadFreq.toFixed(2)}%<br>
+                                平均点差: ${topMarket.avgSpread.toFixed(4)}%
+                            </div>
+                        `;
+                    }
+                } else {
+                    throw new Error(analysisData.error || '分析数据获取失败');
+                }
+                
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '<strong>🎉 所有测试通过！前端可以正常连接到后端服务器</strong>';
+                
+            } catch (error) {
+                console.error('连接测试失败:', error);
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `<strong>❌ 连接失败</strong><br>错误: ${error.message}`;
+                
+                resultsDiv.innerHTML += `
+                    <div class="status error">
+                        <strong>错误详情:</strong><br>
+                        <pre>${error.stack || error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+        
+        // 页面加载后立即测试
+        testConnection();
+        
+        // 每30秒重新测试一次
+        setInterval(testConnection, 30000);
+    </script>
+</body>
+</html>
