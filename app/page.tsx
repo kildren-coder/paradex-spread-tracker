@@ -175,7 +175,7 @@ export default function Home() {
                 <strong>稳定性因子:</strong> 基于中等点差频率和低波动性计算，影响零点差的权重
               </div>
               <div className="metric-item">
-                <strong>一致性奖励:</strong> 零点差频率>20%且稳定点差频率>30%时获得额外奖励
+                <strong>一致性奖励:</strong> 零点差频率&gt;20%且稳定点差频率&gt;30%时获得额外奖励
               </div>
             </div>
           </details>
