@@ -15,15 +15,27 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [serverStatus, setServerStatus] = useState<any>(null);
 
+  // 在组件加载时显示数据源配置
+  useEffect(() => {
+    console.log('🔧 Paradex 前端配置信息:');
+    console.log(`📡 数据服务器地址: ${DATA_SERVER_URL}`);
+    console.log(`🌍 环境变量 NEXT_PUBLIC_DATA_SERVER_URL: ${process.env.NEXT_PUBLIC_DATA_SERVER_URL || '未设置'}`);
+    console.log(`🏠 当前域名: ${typeof window !== 'undefined' ? window.location.origin : 'SSR'}`);
+    console.log(`⏰ 初始化时间: ${new Date().toLocaleString()}`);
+    console.log('---');
+  }, []);
+
   const fetchAnalysisData = useCallback(async () => {
     try {
       setError(null);
       
+      console.log(`📊 正在从 ${DATA_SERVER_URL}/api/analysis 获取分析数据...`);
       const response = await fetch(`${DATA_SERVER_URL}/api/analysis`, {
         cache: 'no-store',
       });
       
       if (!response.ok) {
+        console.error(`❌ 分析数据请求失败: HTTP ${response.status} ${response.statusText}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -31,13 +43,15 @@ export default function Home() {
       
       if (result.success) {
         setAnalysis(result.data);
-        console.log(`Updated analysis for ${result.totalMarkets} markets at ${new Date().toLocaleTimeString()}`);
+        console.log(`✅ 分析数据更新成功: ${result.totalMarkets} 个市场, ${result.data.length} 个有效分析 (${new Date().toLocaleTimeString()})`);
       } else {
+        console.error('❌ 分析数据响应错误:', result.error);
         throw new Error(result.error || 'Failed to fetch analysis');
       }
       
     } catch (error) {
-      console.error('Error fetching analysis data:', error);
+      console.error('❌ 获取分析数据时发生错误:', error);
+      console.error(`🔗 尝试连接的地址: ${DATA_SERVER_URL}/api/analysis`);
       setError('无法连接到数据服务器，请确保后端服务正在运行');
     } finally {
       setLoading(false);
@@ -47,6 +61,7 @@ export default function Home() {
 
   const fetchServerStatus = useCallback(async () => {
     try {
+      console.log(`🔍 正在从 ${DATA_SERVER_URL}/api/status 获取服务器状态...`);
       const response = await fetch(`${DATA_SERVER_URL}/api/status`, {
         cache: 'no-store',
       });
@@ -54,13 +69,24 @@ export default function Home() {
       if (response.ok) {
         const status = await response.json();
         setServerStatus(status);
+        console.log(`✅ 服务器状态获取成功:`, {
+          status: status.status,
+          markets: status.markets,
+          historySize: status.historySize,
+          useProxy: status.useProxy,
+          proxyStats: status.useProxy ? `${status.proxyStats?.active}/${status.proxyStats?.total}` : 'N/A'
+        });
+      } else {
+        console.error(`❌ 服务器状态请求失败: HTTP ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error fetching server status:', error);
+      console.error('❌ 获取服务器状态时发生错误:', error);
+      console.error(`🔗 尝试连接的地址: ${DATA_SERVER_URL}/api/status`);
     }
   }, []);
 
   const handleRefresh = () => {
+    console.log('🔄 用户手动刷新数据...');
     setRefreshing(true);
     fetchAnalysisData();
     fetchServerStatus();
@@ -146,6 +172,9 @@ export default function Home() {
             )}
           </div>
         )}
+        <div className="data-source-info">
+          📡 数据源: <code>{DATA_SERVER_URL}</code>
+        </div>
         <div className="metrics-explanation">
           <details>
             <summary>📊 指标说明</summary>
