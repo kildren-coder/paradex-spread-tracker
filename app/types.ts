@@ -14,6 +14,17 @@ export interface BBO {
   last_updated_at: number;
 }
 
+export interface MarketSpread {
+  symbol: string;
+  bid_price: number;
+  ask_price: number;
+  spread: number;
+  spread_percent: number;
+  bid_size: string;
+  ask_size: string;
+  timestamp: number;
+}
+
 export interface MarketAnalysis {
   symbol: string;
   totalPoints: number;
