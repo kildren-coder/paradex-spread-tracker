@@ -115,16 +115,22 @@ npm install @sentry/nextjs
 
 ### 常见问题
 
-1. **API连接失败**
+1. **多区域部署错误**
+   ```
+   Deploying Serverless Functions to multiple regions is restricted to the Pro and Enterprise plans.
+   ```
+   **解决方案**: 已修复，vercel.json中移除了regions配置
+
+2. **API连接失败**
    - 检查环境变量是否正确设置
    - 确认后端服务器正在运行
    - 检查防火墙设置
 
-2. **CORS错误**
+3. **CORS错误**
    - 在后端添加Vercel域名到CORS白名单
    - 检查请求头设置
 
-3. **构建失败**
+4. **构建失败**
    - 检查依赖版本兼容性
    - 查看Vercel构建日志
 
