@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AnalysisCard from './components/AnalysisCard';
+import MonitoringControl from './components/MonitoringControl';
 import { MarketAnalysis } from './types';
 
 // 数据收集服务器地址 - 生产环境需要更改
@@ -14,6 +15,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [serverStatus, setServerStatus] = useState<any>(null);
+  const [monitoringActive, setMonitoringActive] = useState(false);
 
   // 在组件加载时显示数据源配置
   useEffect(() => {
@@ -26,6 +28,13 @@ export default function Home() {
   }, []);
 
   const fetchAnalysisData = useCallback(async () => {
+    // 只有在监控激活时才获取分析数据
+    if (!monitoringActive) {
+      setAnalysis([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setError(null);
       
@@ -52,12 +61,14 @@ export default function Home() {
     } catch (error) {
       console.error('❌ 获取分析数据时发生错误:', error);
       console.error(`🔗 尝试连接的地址: ${DATA_SERVER_URL}/api/analysis`);
-      setError('无法连接到数据服务器，请确保后端服务正在运行');
+      if (monitoringActive) {
+        setError('无法连接到数据服务器，请确保后端服务正在运行');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [monitoringActive]);
 
   const fetchServerStatus = useCallback(async () => {
     try {
@@ -69,11 +80,18 @@ export default function Home() {
       if (response.ok) {
         const status = await response.json();
         setServerStatus(status);
+        
+        // 更新监控状态
+        if (status.monitoring) {
+          setMonitoringActive(status.monitoring.isActive);
+        }
+        
         console.log(`✅ 服务器状态获取成功:`, {
           status: status.status,
           markets: status.markets,
           historySize: status.historySize,
           useProxy: status.useProxy,
+          monitoringActive: status.monitoring?.isActive,
           proxyStats: status.useProxy ? `${status.proxyStats?.active}/${status.proxyStats?.total}` : 'N/A'
         });
       } else {
@@ -85,6 +103,18 @@ export default function Home() {
     }
   }, []);
 
+  // 监控状态变化处理
+  const handleMonitoringStatusChange = (status: any) => {
+    setMonitoringActive(status.isActive);
+    
+    // 如果监控刚启动，立即获取分析数据
+    if (status.isActive && !monitoringActive) {
+      setTimeout(() => {
+        fetchAnalysisData();
+      }, 2000); // 给后端2秒时间开始收集数据
+    }
+  };
+
   const handleRefresh = () => {
     console.log('🔄 用户手动刷新数据...');
     setRefreshing(true);
@@ -93,17 +123,18 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchAnalysisData();
-    fetchServerStatus();
+    fetchServerStatus(); // 初始获取服务器状态
     
-    // 每10秒刷新分析数据
+    // 只有在监控激活时才定期获取分析数据
     const interval = setInterval(() => {
-      fetchAnalysisData();
-      fetchServerStatus();
+      fetchServerStatus(); // 始终获取服务器状态
+      if (monitoringActive) {
+        fetchAnalysisData(); // 只在监控激活时获取分析数据
+      }
     }, 10000);
     
     return () => clearInterval(interval);
-  }, [fetchAnalysisData, fetchServerStatus]);
+  }, [fetchAnalysisData, fetchServerStatus, monitoringActive]);
 
   // 实时时钟
   useEffect(() => {
@@ -158,60 +189,114 @@ export default function Home() {
     <div className="container">
       <div className="header">
         <h1>Paradex 点差稳定性分析</h1>
-        <p>基于3分钟滑动窗口的零点差/负点差频率分析 • 按稳定性评分排序</p>
+        <p>基于3分钟滑动窗口的零点差/负点差频率分析 • 按需监控模式</p>
         <div className="current-time">
           当前时间: {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
         </div>
-        {serverStatus && (
-          <div className="server-status">
-            数据收集状态: {serverStatus.isCollecting ? '🟢 收集中' : '🔴 停止'} | 
-            市场数: {serverStatus.markets} | 
-            历史数据: {serverStatus.historySize} 个市场
-            {serverStatus.useProxy && serverStatus.proxyStats && (
-              <span> | 代理: {serverStatus.proxyStats.active}/{serverStatus.proxyStats.total} 可用</span>
-            )}
-          </div>
-        )}
         <div className="data-source-info">
           📡 数据源: <code>{DATA_SERVER_URL}</code>
         </div>
-        <div className="metrics-explanation">
-          <details>
-            <summary>📊 指标说明</summary>
-            <div className="explanation-content">
-              <div className="metric-item">
-                <strong>数据点数:</strong> 3分钟内收集到的价格快照数量，每2秒收集一次
-              </div>
-              <div className="metric-item">
-                <strong>稳定点差 (0.001%-0.01%):</strong> 最佳交易区间，流动性充足且成本可控
-              </div>
-              <div className="metric-item">
-                <strong>低点差 (&lt;0.001%):</strong> 极低成本，但可能流动性不足
-              </div>
-              <div className="metric-item">
-                <strong>零点差/负点差:</strong> 理论套利机会，但需警惕流动性陷阱
-              </div>
-              <div className="metric-item">
-                <strong>高点差 (&gt;0.01%):</strong> 交易成本较高，频繁出现表示风险较大
-              </div>
-              <div className="metric-item">
-                <strong>极高点差 (&gt;0.05%):</strong> 极高风险，可能导致重大损失
-              </div>
-              <div className="metric-item">
-                <strong>动态零点差权重:</strong> 稳定市场的零点差权重高(最高2.0)，不稳定市场权重低(最低0.2)
-              </div>
-              <div className="metric-item">
-                <strong>稳定性因子:</strong> 基于中等点差频率和低波动性计算，影响零点差的权重
-              </div>
-              <div className="metric-item">
-                <strong>一致性奖励:</strong> 零点差频率&gt;20%且稳定点差频率&gt;30%时获得额外奖励
-              </div>
-            </div>
-          </details>
+      </div>
+
+      {/* 监控控制面板 */}
+      <MonitoringControl 
+        serverUrl={DATA_SERVER_URL}
+        onStatusChange={handleMonitoringStatusChange}
+      />
+
+      {/* 服务器状态显示 */}
+      {serverStatus && (
+        <div className="server-status">
+          服务器状态: {serverStatus.status === 'running' ? '🟢 运行中' : '🔴 离线'} | 
+          市场数: {serverStatus.markets} | 
+          历史数据: {serverStatus.historySize} 个市场
+          {serverStatus.useProxy && serverStatus.proxyStats && (
+            <span> | 代理: {serverStatus.proxyStats.active}/{serverStatus.proxyStats.total} 可用</span>
+          )}
+          {serverStatus.monitoring && (
+            <span> | 监控: {serverStatus.monitoring.isActive ? '🟢 激活' : '🔴 停止'}</span>
+          )}
         </div>
+      )}
+
+      {/* 指标说明 */}
+      <div className="metrics-explanation">
+        <details>
+          <summary>📊 指标说明</summary>
+          <div className="explanation-content">
+            <div className="metric-item">
+              <strong>按需监控:</strong> 点击"开始监控"启动15分钟数据收集，节省代理流量
+            </div>
+            <div className="metric-item">
+              <strong>数据点数:</strong> 3分钟内收集到的价格快照数量，每2秒收集一次
+            </div>
+            <div className="metric-item">
+              <strong>稳定点差 (0.001%-0.01%):</strong> 最佳交易区间，流动性充足且成本可控
+            </div>
+            <div className="metric-item">
+              <strong>低点差 (&lt;0.001%):</strong> 极低成本，但可能流动性不足
+            </div>
+            <div className="metric-item">
+              <strong>零点差/负点差:</strong> 理论套利机会，但需警惕流动性陷阱
+            </div>
+            <div className="metric-item">
+              <strong>高点差 (&gt;0.01%):</strong> 交易成本较高，频繁出现表示风险较大
+            </div>
+            <div className="metric-item">
+              <strong>极高点差 (&gt;0.05%):</strong> 极高风险，可能导致重大损失
+            </div>
+            <div className="metric-item">
+              <strong>动态零点差权重:</strong> 稳定市场的零点差权重高(最高2.0)，不稳定市场权重低(最低0.2)
+            </div>
+            <div className="metric-item">
+              <strong>稳定性因子:</strong> 基于中等点差频率和低波动性计算，影响零点差的权重
+            </div>
+            <div className="metric-item">
+              <strong>一致性奖励:</strong> 零点差频率&gt;20%且稳定点差频率&gt;30%时获得额外奖励
+            </div>
+          </div>
+        </details>
       </div>
       
-      {analysis.length === 0 ? (
+      {/* 数据显示区域 */}
+      {!monitoringActive ? (
+        <div className="monitoring-prompt">
+          <div className="prompt-content">
+            <h3>🎛️ 按需监控模式</h3>
+            <p>为了节省代理流量，系统采用按需监控模式。</p>
+            <p>点击上方"开始监控"按钮启动15分钟的数据收集。</p>
+            <div className="prompt-benefits">
+              <h4>💡 优势：</h4>
+              <ul>
+                <li>🔋 大幅节省代理IP流量消耗</li>
+                <li>⚡ 按需使用，完全可控</li>
+                <li>💰 降低运营成本</li>
+                <li>🎯 专注于需要分析的时段</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : loading ? (
+        <div className="loading">
+          正在收集数据，请稍候...
+          <div className="collection-info">
+            <p>系统正在每秒收集所有PERP市场的点差数据</p>
+            <p>需要积累足够的历史数据才能进行稳定性分析</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="error">
+          {error}
+          <button 
+            className="refresh-button" 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={{ position: 'static', margin: '15px auto', display: 'block' }}
+          >
+            {refreshing ? '重试中...' : '重试连接'}
+          </button>
+        </div>
+      ) : analysis.length === 0 ? (
         <div className="loading">
           数据收集中，请等待至少1分钟以获得有效分析...
           <div className="collection-info">
@@ -227,13 +312,15 @@ export default function Home() {
         </div>
       )}
       
-      <button 
-        className="refresh-button" 
-        onClick={handleRefresh}
-        disabled={refreshing}
-      >
-        {refreshing ? '刷新中...' : '刷新数据'}
-      </button>
+      {monitoringActive && (
+        <button 
+          className="refresh-button" 
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          {refreshing ? '刷新中...' : '刷新数据'}
+        </button>
+      )}
     </div>
   );
 }

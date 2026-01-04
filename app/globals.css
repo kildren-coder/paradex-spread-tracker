@@ -609,3 +609,310 @@ body {
   padding-bottom: 4px;
   margin-bottom: 4px;
 }
+
+/* 监控控制面板样式 */
+.monitoring-control {
+  background: #1a1a1a;
+  border: 2px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.monitoring-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.monitoring-header h3 {
+  color: #667eea;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.status-active {
+  color: #10b981;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.status-inactive {
+  color: #ef4444;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.countdown-display {
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.countdown-time {
+  font-size: 1.1rem;
+  color: #667eea;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.time-value {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #10b981;
+}
+
+.countdown-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.countdown-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #667eea 100%);
+  border-radius: 4px;
+  transition: width 1s ease;
+}
+
+.control-buttons {
+  margin-bottom: 20px;
+}
+
+.start-button {
+  width: 100%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 15px 20px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.start-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.active-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.extend-button {
+  flex: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.extend-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.stop-button {
+  flex: 1;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stop-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.extend-button:disabled,
+.stop-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  color: #ef4444;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+}
+
+.monitoring-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.info-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.info-value.collecting {
+  color: #10b981;
+}
+
+.info-value.idle {
+  color: #6b7280;
+}
+
+.monitoring-tips {
+  border-top: 1px solid #333;
+  padding-top: 15px;
+}
+
+.monitoring-tips details {
+  cursor: pointer;
+}
+
+.monitoring-tips summary {
+  color: #667eea;
+  font-weight: 600;
+  margin-bottom: 10px;
+  user-select: none;
+}
+
+.monitoring-tips summary:hover {
+  color: #8b5cf6;
+}
+
+.tips-content {
+  padding-left: 15px;
+}
+
+.tips-content p {
+  color: #ccc;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .monitoring-control {
+    margin: 15px;
+    padding: 15px;
+  }
+  
+  .active-controls {
+    flex-direction: column;
+  }
+  
+  .monitoring-info {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .countdown-time {
+    font-size: 1rem;
+  }
+  
+  .time-value {
+    font-size: 1.2rem;
+  }
+}
+
+/* 监控提示区域样式 */
+.monitoring-prompt {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  padding: 30px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.prompt-content h3 {
+  color: #667eea;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+}
+
+.prompt-content p {
+  color: #ccc;
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.prompt-benefits {
+  margin-top: 25px;
+  text-align: left;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prompt-benefits h4 {
+  color: #10b981;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.prompt-benefits ul {
+  list-style: none;
+  padding: 0;
+}
+
+.prompt-benefits li {
+  color: #ccc;
+  margin-bottom: 8px;
+  padding-left: 20px;
+  position: relative;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.prompt-benefits li::before {
+  content: attr(data-icon);
+  position: absolute;
+  left: 0;
+  top: 0;
+}

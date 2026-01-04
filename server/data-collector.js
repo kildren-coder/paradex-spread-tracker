@@ -46,6 +46,13 @@ class DataCollector {
     this.proxyManager = new ProxyManager();
     this.useProxy = false;
     
+    // 按需监控相关属性
+    this.isMonitoringActive = false;
+    this.monitoringTimer = null;
+    this.collectionInterval = null;
+    this.monitoringStartTime = null;
+    this.monitoringDuration = 15 * 60 * 1000; // 15分钟
+    
     // 加载历史数据
     this.loadHistoryData();
     
@@ -422,8 +429,101 @@ class DataCollector {
     }
   }
 
-  start() {
-    console.log('Starting data collection...');
+  // 按需监控控制方法
+  startMonitoring() {
+    if (this.isMonitoringActive) {
+      // 如果已经在监控，重置计时器
+      this.resetMonitoringTimer();
+      console.log('🔄 监控计时器已重置，延长15分钟');
+      return {
+        success: true,
+        message: '监控时间已延长',
+        remainingTime: this.getRemainingTime()
+      };
+    }
+
+    console.log('🚀 开始按需监控...');
+    this.isMonitoringActive = true;
+    this.monitoringStartTime = Date.now();
+    
+    // 立即开始数据收集
+    this.startDataCollection();
+    
+    // 设置15分钟自动停止
+    this.resetMonitoringTimer();
+    
+    return {
+      success: true,
+      message: '监控已启动',
+      remainingTime: this.monitoringDuration
+    };
+  }
+
+  stopMonitoring() {
+    if (!this.isMonitoringActive) {
+      return {
+        success: false,
+        message: '监控未在运行'
+      };
+    }
+
+    console.log('⏹️ 停止按需监控...');
+    this.isMonitoringActive = false;
+    this.monitoringStartTime = null;
+    
+    // 清除定时器
+    if (this.monitoringTimer) {
+      clearTimeout(this.monitoringTimer);
+      this.monitoringTimer = null;
+    }
+    
+    // 停止数据收集
+    this.stopDataCollection();
+    
+    return {
+      success: true,
+      message: '监控已停止'
+    };
+  }
+
+  resetMonitoringTimer() {
+    // 清除现有计时器
+    if (this.monitoringTimer) {
+      clearTimeout(this.monitoringTimer);
+    }
+    
+    // 设置新的15分钟计时器
+    this.monitoringTimer = setTimeout(() => {
+      console.log('⏰ 15分钟监控时间到，自动停止监控');
+      this.stopMonitoring();
+    }, this.monitoringDuration);
+  }
+
+  getRemainingTime() {
+    if (!this.isMonitoringActive || !this.monitoringStartTime) {
+      return 0;
+    }
+    
+    const elapsed = Date.now() - this.monitoringStartTime;
+    const remaining = Math.max(0, this.monitoringDuration - elapsed);
+    return remaining;
+  }
+
+  getMonitoringStatus() {
+    return {
+      isActive: this.isMonitoringActive,
+      startTime: this.monitoringStartTime,
+      remainingTime: this.getRemainingTime(),
+      isCollecting: this.isCollecting
+    };
+  }
+
+  startDataCollection() {
+    if (this.collectionInterval) {
+      return; // 已经在收集
+    }
+
+    console.log('📊 开始数据收集...');
     
     // 立即收集一次
     this.collectSpreadData();
@@ -432,19 +532,37 @@ class DataCollector {
     const interval = this.useProxy ? 1000 : 60000; // 代理模式每秒，直连模式每分钟
     console.log(`Collection interval: ${interval/1000}s`);
     
-    setInterval(() => {
-      // 不管上一轮是否完成，都尝试启动新的收集
-      // collectSpreadData内部有isCollecting保护，避免重复执行
-      this.collectSpreadData();
+    this.collectionInterval = setInterval(() => {
+      if (this.isMonitoringActive) {
+        this.collectSpreadData();
+      }
     }, interval);
     
     // 添加性能监控
     if (this.useProxy) {
-      setInterval(() => {
-        const stats = this.proxyManager.getStats();
-        console.log(`Proxy stats: ${stats.active}/${stats.total} active, ${stats.failed} failed`);
+      this.proxyStatsInterval = setInterval(() => {
+        if (this.isMonitoringActive) {
+          const stats = this.proxyManager.getStats();
+          console.log(`Proxy stats: ${stats.active}/${stats.total} active, ${stats.failed} failed`);
+        }
       }, 30000); // 每30秒输出一次代理统计
     }
+  }
+
+  stopDataCollection() {
+    console.log('⏹️ 停止数据收集...');
+    
+    if (this.collectionInterval) {
+      clearInterval(this.collectionInterval);
+      this.collectionInterval = null;
+    }
+    
+    if (this.proxyStatsInterval) {
+      clearInterval(this.proxyStatsInterval);
+      this.proxyStatsInterval = null;
+    }
+    
+    this.isCollecting = false;
   }
 }
 
