@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface MonitoringStatus {
   isActive: boolean;
@@ -23,6 +23,9 @@ export default function MonitoringControl({ serverUrl, onStatusChange }: Monitor
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 使用ref来跟踪上一次的isActive状态，避免闭包问题
+  const lastIsActiveRef = useRef<boolean>(false);
 
   // 格式化剩余时间
   const formatRemainingTime = (ms: number) => {
@@ -39,7 +42,13 @@ export default function MonitoringControl({ serverUrl, onStatusChange }: Monitor
         const data = await response.json();
         if (data.success) {
           setStatus(data);
-          onStatusChange?.(data);
+          
+          // 使用ref来比较状态变化，避免闭包问题
+          if (lastIsActiveRef.current !== data.isActive) {
+            console.log(`📡 MonitoringControl: 状态变化 ${lastIsActiveRef.current} → ${data.isActive}`);
+            lastIsActiveRef.current = data.isActive;
+            onStatusChange?.(data);
+          }
         }
       }
     } catch (error) {

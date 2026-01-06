@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AnalysisCard from './components/AnalysisCard';
 import MonitoringControl from './components/MonitoringControl';
 import { MarketAnalysis } from './types';
@@ -10,12 +10,15 @@ const DATA_SERVER_URL = process.env.NEXT_PUBLIC_DATA_SERVER_URL || 'http://local
 
 export default function Home() {
   const [analysis, setAnalysis] = useState<MarketAnalysis[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [serverStatus, setServerStatus] = useState<any>(null);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  
+  // 使用ref来跟踪监控状态，避免闭包问题
+  const monitoringActiveRef = useRef(false);
 
   // 在组件加载时显示数据源配置
   useEffect(() => {
@@ -28,10 +31,8 @@ export default function Home() {
   }, []);
 
   const fetchAnalysisData = useCallback(async () => {
-    // 只有在监控激活时才获取分析数据
-    if (!monitoringActive) {
-      setAnalysis([]);
-      setLoading(false);
+    // 使用ref来检查监控状态
+    if (!monitoringActiveRef.current) {
       return;
     }
 
@@ -61,14 +62,14 @@ export default function Home() {
     } catch (error) {
       console.error('❌ 获取分析数据时发生错误:', error);
       console.error(`🔗 尝试连接的地址: ${DATA_SERVER_URL}/api/analysis`);
-      if (monitoringActive) {
+      if (monitoringActiveRef.current) {
         setError('无法连接到数据服务器，请确保后端服务正在运行');
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [monitoringActive]);
+  }, []);
 
   const fetchServerStatus = useCallback(async () => {
     try {
@@ -81,11 +82,7 @@ export default function Home() {
         const status = await response.json();
         setServerStatus(status);
         
-        // 更新监控状态
-        if (status.monitoring) {
-          setMonitoringActive(status.monitoring.isActive);
-        }
-        
+        // 不再在这里更新monitoringActive，让MonitoringControl组件负责
         console.log(`✅ 服务器状态获取成功:`, {
           status: status.status,
           markets: status.markets,
@@ -103,17 +100,28 @@ export default function Home() {
     }
   }, []);
 
-  // 监控状态变化处理
-  const handleMonitoringStatusChange = (status: any) => {
+  // 监控状态变化处理 - 简化逻辑
+  const handleMonitoringStatusChange = useCallback((status: any) => {
+    console.log(`🎛️ 监控状态变化: ${monitoringActiveRef.current} → ${status.isActive}`);
+    
+    const wasActive = monitoringActiveRef.current;
+    monitoringActiveRef.current = status.isActive;
     setMonitoringActive(status.isActive);
     
     // 如果监控刚启动，立即获取分析数据
-    if (status.isActive && !monitoringActive) {
+    if (status.isActive && !wasActive) {
+      console.log('🚀 监控刚启动，3秒后获取分析数据...');
       setTimeout(() => {
         fetchAnalysisData();
-      }, 2000); // 给后端2秒时间开始收集数据
+      }, 3000);
     }
-  };
+    
+    // 如果监控停止，清空分析数据
+    if (!status.isActive && wasActive) {
+      console.log('⏹️ 监控已停止，清空分析数据');
+      setAnalysis([]);
+    }
+  }, [fetchAnalysisData]);
 
   const handleRefresh = () => {
     console.log('🔄 用户手动刷新数据...');
@@ -124,17 +132,21 @@ export default function Home() {
 
   useEffect(() => {
     fetchServerStatus(); // 初始获取服务器状态
-    
-    // 只有在监控激活时才定期获取分析数据
+  }, []);
+
+  // 单独的定时器effect
+  useEffect(() => {
     const interval = setInterval(() => {
-      fetchServerStatus(); // 始终获取服务器状态
-      if (monitoringActive) {
-        fetchAnalysisData(); // 只在监控激活时获取分析数据
+      fetchServerStatus();
+      // 使用ref来检查监控状态
+      if (monitoringActiveRef.current) {
+        console.log('⏰ 定时获取分析数据...');
+        fetchAnalysisData();
       }
     }, 10000);
     
     return () => clearInterval(interval);
-  }, [fetchAnalysisData, fetchServerStatus, monitoringActive]);
+  }, [fetchAnalysisData, fetchServerStatus]);
 
   // 实时时钟
   useEffect(() => {
@@ -208,6 +220,7 @@ export default function Home() {
       {serverStatus && (
         <div className="server-status">
           服务器状态: {serverStatus.status === 'running' ? '🟢 运行中' : '🔴 离线'} | 
+          模式: {serverStatus.mode === 'websocket' ? '🔌 WebSocket' : '📡 HTTP'} |
           市场数: {serverStatus.markets} | 
           历史数据: {serverStatus.historySize} 个市场
           {serverStatus.useProxy && serverStatus.proxyStats && (
@@ -216,6 +229,17 @@ export default function Home() {
           {serverStatus.monitoring && (
             <span> | 监控: {serverStatus.monitoring.isActive ? '🟢 激活' : '🔴 停止'}</span>
           )}
+        </div>
+      )}
+
+      {/* 流量统计显示 */}
+      {serverStatus?.trafficStats && serverStatus.trafficStats.startTime && (
+        <div className="traffic-stats">
+          📊 流量统计: 
+          接收 {(serverStatus.trafficStats.bytesReceived / 1024).toFixed(2)} KB | 
+          发送 {(serverStatus.trafficStats.bytesSent / 1024).toFixed(2)} KB | 
+          消息 {serverStatus.trafficStats.messagesReceived} 条 |
+          连接 {serverStatus.trafficStats.activeConnections} 个
         </div>
       )}
 

@@ -1,6 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const DataCollector = require('./data-collector');
+
+// 根据环境变量选择数据收集器
+const useWebSocket = process.env.USE_WEBSOCKET !== 'false'; // 默认使用WebSocket
+const DataCollector = useWebSocket 
+  ? require('./ws-data-collector')
+  : require('./data-collector');
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -65,16 +70,19 @@ app.get('/api/status', (req, res) => {
   try {
     const proxyStats = collector.getProxyStats();
     const monitoringStatus = collector.getMonitoringStatus();
+    const trafficStats = collector.getTrafficStats ? collector.getTrafficStats() : null;
     
     res.json({
       success: true,
       status: 'running',
+      mode: monitoringStatus.mode || 'http',
       markets: collector.markets.length,
       historySize: collector.spreadHistory.size,
       isCollecting: collector.isCollecting,
       useProxy: collector.useProxy,
       proxyStats,
       monitoring: monitoringStatus,
+      trafficStats,
       timestamp: Date.now()
     });
   } catch (error) {
@@ -133,20 +141,19 @@ app.get('/api/monitoring/status', (req, res) => {
 async function startServer() {
   try {
     await collector.initialize();
-    // 注意：不再自动启动数据收集，改为按需启动
-    console.log('✅ 数据收集器已初始化，等待按需启动');
+    console.log(`✅ 数据收集器已初始化 (${useWebSocket ? 'WebSocket' : 'HTTP'} 模式)`);
+    console.log('🎛️ 按需监控模式：访问前端点击"开始监控"按钮启动');
     
     app.listen(port, () => {
-      console.log(`Data collection server running on port ${port}`);
+      console.log(`🚀 数据收集服务器运行在端口 ${port}`);
+      console.log(`📡 模式: ${useWebSocket ? 'WebSocket (节省流量)' : 'HTTP (传统)'}`);
       console.log(`API endpoints:`);
-      console.log(`  GET /api/analysis - Get spread analysis`);
-      console.log(`  GET /api/market/:symbol/history - Get market history`);
-      console.log(`  GET /api/status - Get server status`);
-      console.log(`  POST /api/monitoring/start - Start monitoring (15 min)`);
-      console.log(`  POST /api/monitoring/stop - Stop monitoring`);
-      console.log(`  GET /api/monitoring/status - Get monitoring status`);
-      console.log('');
-      console.log('🎛️ 按需监控模式：访问前端点击"开始监控"按钮启动');
+      console.log(`  GET /api/analysis - 获取点差分析`);
+      console.log(`  GET /api/market/:symbol/history - 获取市场历史`);
+      console.log(`  GET /api/status - 获取服务器状态`);
+      console.log(`  POST /api/monitoring/start - 开始监控 (15分钟)`);
+      console.log(`  POST /api/monitoring/stop - 停止监控`);
+      console.log(`  GET /api/monitoring/status - 获取监控状态`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

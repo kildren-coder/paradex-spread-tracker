@@ -10,7 +10,9 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.22.1",
-    "node-fetch": "^2.7.0"
+    "https-proxy-agent": "^7.0.6",
+    "node-fetch": "^2.7.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

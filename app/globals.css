@@ -389,6 +389,18 @@ body {
   font-weight: 500;
 }
 
+/* 流量统计样式 */
+.traffic-stats {
+  margin: 10px 0;
+  font-size: 0.85rem;
+  color: #10b981;
+  text-align: center;
+  padding: 8px 15px;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
 .setup-instructions {
   background: #1a1a1a;
   border: 1px solid #333;
