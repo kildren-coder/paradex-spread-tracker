@@ -13,12 +13,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<string>('');
   const [serverStatus, setServerStatus] = useState<any>(null);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   // 使用ref来跟踪监控状态，避免闭包问题
   const monitoringActiveRef = useRef(false);
+
+  // 客户端挂载后才显示时间，避免hydration错误
+  useEffect(() => {
+    setMounted(true);
+    setCurrentTime(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+  }, []);
 
   // 在组件加载时显示数据源配置
   useEffect(() => {
@@ -150,12 +157,14 @@ export default function Home() {
 
   // 实时时钟
   useEffect(() => {
+    if (!mounted) return;
+    
     const clockInterval = setInterval(() => {
-      setCurrentTime(new Date());
+      setCurrentTime(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
     }, 1000);
     
     return () => clearInterval(clockInterval);
-  }, []);
+  }, [mounted]);
 
   if (loading) {
     return (
@@ -203,7 +212,7 @@ export default function Home() {
         <h1>Paradex 点差稳定性分析</h1>
         <p>基于3分钟滑动窗口的零点差/负点差频率分析 • 按需监控模式</p>
         <div className="current-time">
-          当前时间: {currentTime.toLocaleTimeString('zh-CN', { hour12: false })}
+          当前时间: {mounted ? currentTime : '--:--:--'}
         </div>
         <div className="data-source-info">
           📡 数据源: <code>{DATA_SERVER_URL}</code>

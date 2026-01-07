@@ -34,12 +34,11 @@ class HybridDataCollector {
     this.wsThrottleMs = 1000;
     
     // HTTP深度分析相关
-    this.httpAnalysisQueue = []; // 待分析队列
     this.httpAnalyzing = new Set(); // 正在分析的币种
     this.httpCooldown = new Map(); // symbol -> cooldown end time
     this.httpCooldownMs = 3 * 60 * 1000; // 3分钟冷却
     this.httpAnalysisDuration = 60 * 1000; // 每币种分析1分钟
-    this.maxConcurrentHttpAnalysis = 2; // 同时最多分析2个币种
+    this.httpCandidateThreshold = 30; // 候选分数阈值
     this.httpAnalysisInterval = null;
     
     // 候选分数
@@ -380,9 +379,9 @@ class HybridDataCollector {
   startHttpAnalysis() {
     if (this.httpAnalysisInterval) return;
 
-    console.log('🔍 启动HTTP深度分析...');
+    console.log('🔍 启动HTTP深度分析（同时分析所有高分币种）...');
     
-    // 每秒检查并执行HTTP分析
+    // 每秒对所有高分币种发起HTTP请求
     this.httpAnalysisInterval = setInterval(() => {
       this.runHttpAnalysisCycle();
     }, 1000);
@@ -396,66 +395,54 @@ class HybridDataCollector {
     this.httpAnalyzing.clear();
   }
 
-  // HTTP分析循环
+  // HTTP分析循环 - 同时分析所有高分币种
   async runHttpAnalysisCycle() {
-    // 清理过期的冷却
     const now = Date.now();
+    
+    // 清理过期的冷却
     for (const [symbol, endTime] of this.httpCooldown.entries()) {
       if (now >= endTime) {
         this.httpCooldown.delete(symbol);
       }
     }
 
-    // 如果正在分析的数量已满，跳过
-    if (this.httpAnalyzing.size >= this.maxConcurrentHttpAnalysis) {
-      // 对正在分析的币种发起HTTP请求
-      for (const symbol of this.httpAnalyzing) {
-        this.fetchHttpBBO(symbol);
-      }
-      return;
-    }
-
-    // 选择下一个要分析的币种
-    const nextSymbol = this.selectNextForHttpAnalysis();
-    if (nextSymbol) {
-      console.log(`📡 开始HTTP深度分析: ${nextSymbol} (候选分数: ${this.candidateScores.get(nextSymbol)})`);
-      this.httpAnalyzing.add(nextSymbol);
-      
-      // 设置分析结束时间
-      setTimeout(() => {
-        this.finishHttpAnalysis(nextSymbol);
-      }, this.httpAnalysisDuration);
-    }
-
-    // 对正在分析的币种发起HTTP请求
-    for (const symbol of this.httpAnalyzing) {
-      this.fetchHttpBBO(symbol);
-    }
-  }
-
-  // 选择下一个要分析的币种
-  selectNextForHttpAnalysis() {
-    const now = Date.now();
-    
-    // 按候选分数排序，选择分数最高且不在冷却中的
-    const candidates = Array.from(this.candidateScores.entries())
+    // 获取所有符合条件的币种（高分且不在冷却中）
+    const eligibleSymbols = Array.from(this.candidateScores.entries())
       .filter(([symbol, score]) => {
-        // 排除正在分析的
-        if (this.httpAnalyzing.has(symbol)) return false;
         // 排除冷却中的
         if (this.httpCooldown.has(symbol) && this.httpCooldown.get(symbol) > now) return false;
         // 排除分数太低的
-        if (score < 30) return false;
+        if (score < this.httpCandidateThreshold) return false;
         return true;
       })
-      .sort((a, b) => b[1] - a[1]);
+      .map(([symbol]) => symbol);
 
-    return candidates.length > 0 ? candidates[0][0] : null;
+    // 更新正在分析的集合
+    const newAnalyzing = new Set(eligibleSymbols);
+    
+    // 检查哪些币种刚开始分析
+    for (const symbol of eligibleSymbols) {
+      if (!this.httpAnalyzing.has(symbol)) {
+        console.log(`📡 开始HTTP分析: ${symbol} (候选分数: ${this.candidateScores.get(symbol)})`);
+        // 设置1分钟后进入冷却
+        setTimeout(() => {
+          this.finishHttpAnalysis(symbol);
+        }, this.httpAnalysisDuration);
+      }
+    }
+    
+    this.httpAnalyzing = newAnalyzing;
+
+    // 对所有正在分析的币种并发发起HTTP请求
+    const fetchPromises = eligibleSymbols.map(symbol => this.fetchHttpBBO(symbol));
+    await Promise.allSettled(fetchPromises);
   }
 
   // 完成HTTP分析
   finishHttpAnalysis(symbol) {
-    console.log(`✅ HTTP深度分析完成: ${symbol}`);
+    if (!this.httpAnalyzing.has(symbol)) return;
+    
+    console.log(`✅ HTTP分析完成: ${symbol}，进入3分钟冷却`);
     this.httpAnalyzing.delete(symbol);
     
     // 进入冷却期
