@@ -2,10 +2,19 @@ const express = require('express');
 const cors = require('cors');
 
 // 根据环境变量选择数据收集器
-const useWebSocket = process.env.USE_WEBSOCKET !== 'false'; // 默认使用WebSocket
-const DataCollector = useWebSocket 
-  ? require('./ws-data-collector')
-  : require('./data-collector');
+// hybrid: 混合模式（默认，推荐）
+// websocket: 纯WebSocket模式
+// http: 纯HTTP模式
+const collectorMode = process.env.COLLECTOR_MODE || 'hybrid';
+
+let DataCollector;
+if (collectorMode === 'websocket') {
+  DataCollector = require('./ws-data-collector');
+} else if (collectorMode === 'http') {
+  DataCollector = require('./data-collector');
+} else {
+  DataCollector = require('./hybrid-data-collector');
+}
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -141,12 +150,16 @@ app.get('/api/monitoring/status', (req, res) => {
 async function startServer() {
   try {
     await collector.initialize();
-    console.log(`✅ 数据收集器已初始化 (${useWebSocket ? 'WebSocket' : 'HTTP'} 模式)`);
+    console.log(`✅ 数据收集器已初始化 (${collectorMode} 模式)`);
     console.log('🎛️ 按需监控模式：访问前端点击"开始监控"按钮启动');
     
     app.listen(port, () => {
       console.log(`🚀 数据收集服务器运行在端口 ${port}`);
-      console.log(`📡 模式: ${useWebSocket ? 'WebSocket (节省流量)' : 'HTTP (传统)'}`);
+      console.log(`📡 模式: ${collectorMode}`);
+      if (collectorMode === 'hybrid') {
+        console.log(`   - WebSocket: 持续监控，节流1次/秒`);
+        console.log(`   - HTTP: 轮询分析高分币种，3分钟冷却`);
+      }
       console.log(`API endpoints:`);
       console.log(`  GET /api/analysis - 获取点差分析`);
       console.log(`  GET /api/market/:symbol/history - 获取市场历史`);

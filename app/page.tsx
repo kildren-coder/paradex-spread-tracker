@@ -236,10 +236,23 @@ export default function Home() {
       {serverStatus?.trafficStats && serverStatus.trafficStats.startTime && (
         <div className="traffic-stats">
           📊 流量统计: 
-          接收 {(serverStatus.trafficStats.bytesReceived / 1024).toFixed(2)} KB | 
-          发送 {(serverStatus.trafficStats.bytesSent / 1024).toFixed(2)} KB | 
-          消息 {serverStatus.trafficStats.messagesReceived} 条 |
-          连接 {serverStatus.trafficStats.activeConnections} 个
+          {serverStatus.trafficStats.wsBytesReceived !== undefined ? (
+            <>
+              WS {(serverStatus.trafficStats.wsBytesReceived / 1024).toFixed(1)} KB + 
+              HTTP {(serverStatus.trafficStats.httpBytesReceived / 1024).toFixed(1)} KB = 
+              总计 {(serverStatus.trafficStats.totalBytesReceived / 1024).toFixed(1)} KB |
+              HTTP请求 {serverStatus.trafficStats.httpRequests} 次
+            </>
+          ) : (
+            <>
+              接收 {(serverStatus.trafficStats.bytesReceived / 1024).toFixed(2)} KB | 
+              发送 {(serverStatus.trafficStats.bytesSent / 1024).toFixed(2)} KB | 
+              消息 {serverStatus.trafficStats.messagesReceived} 条
+            </>
+          )}
+          {serverStatus.monitoring?.httpAnalyzing && serverStatus.monitoring.httpAnalyzing.length > 0 && (
+            <span> | 🔍 HTTP分析中: {serverStatus.monitoring.httpAnalyzing.join(', ')}</span>
+          )}
         </div>
       )}
 

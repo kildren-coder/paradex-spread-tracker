@@ -268,6 +268,11 @@ class WebSocketDataCollector {
         const symbol = message.params.channel.replace('bbo.', '');
         const bboData = message.params.data;
         
+        // 调试：记录原始数据格式（仅前几条）
+        if (this.trafficStats.messagesReceived <= 10) {
+          console.log(`📦 原始BBO数据 [${symbol}]:`, JSON.stringify(bboData));
+        }
+        
         if (bboData && bboData.bid && bboData.ask) {
           this.processBBOUpdate(symbol, bboData, connectionId);
         }
@@ -294,12 +299,22 @@ class WebSocketDataCollector {
     const bid = parseFloat(bboData.bid);
     const ask = parseFloat(bboData.ask);
     
+    // 调试：记录解析后的数据（仅前几条）
+    if (this.trafficStats.messagesReceived <= 20) {
+      console.log(`📊 解析后 [${symbol}]: bid=${bid}, ask=${ask}, spread=${ask-bid}, spreadPct=${((ask-bid)/bid*100).toFixed(6)}%`);
+    }
+    
     if (isNaN(bid) || isNaN(ask) || bid <= 0 || ask <= 0) {
       return;
     }
 
     const spread = ask - bid;
     const spreadPercent = (spread / bid) * 100;
+    
+    // 记录零点差/负点差事件
+    if (spreadPercent <= 0) {
+      console.log(`🎯 发现零/负点差 [${symbol}]: bid=${bid}, ask=${ask}, spread=${spreadPercent.toFixed(6)}%`);
+    }
 
     const dataPoint = {
       symbol,
